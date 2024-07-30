@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reklamationsübersicht - Polo Motorrad und Sportswear GmbH</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 80%;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .header img {
+            height: 50px;
+        }
+        .password-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .password-container input {
+            height: 20px;
+            padding: 5px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .password-container button {
+            padding: 5px 10px;
+            font-size: 12px;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            border-radius: 4px;
+            margin-left: 5px;
+            cursor: pointer;
+        }
+        .password-container button:hover {
+            background-color: #0056b3;
+        }
+        .search-bar, .dropdown, .edit-section {
+            margin-bottom: 20px;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .info-table th, .info-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        .info-table th {
+            background-color: #007BFF;
+            color: white;
+        }
+        .hidden {
+            display: none;
+        }
+        .dropdown-menu {
+            cursor: pointer;
+            color: blue;
+            text-decoration: underline;
+        }
+        .edit-section input {
+            margin-right: 10px;
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .edit-section button {
+            padding: 5px 10px;
+            border: none;
+            background-color: #28a745;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .edit-section button:hover {
+            background-color: #218838;
+        }
+    </style>
+    <!-- Firebase-Bibliotheken -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+    <script>
+        // Firebase-Konfiguration
+        const firebaseConfig = {
+            apiKey: "AIzaSyA7OTiyy2f3mXT2PTnldT9zm3eiqE4HPxw",
+            authDomain: "polo-reklamation.firebaseapp.com",
+            projectId: "polo-reklamation",
+            storageBucket: "polo-reklamation.appspot.com",
+            messagingSenderId: "504957283176",
+            appId: "1:504957283176:web:f78e122ecb0397c5ea44dd",
+            measurementId: "G-1L9N7J3F2H",
+            databaseURL: "https://polo-reklamation-default-rtdb.europe-west1.firebasedatabase.app/"
+        };
+        // Firebase initialisieren
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+    </script>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <img src="https://www.polo-motorrad.com/media/logo/websites/1/polo_logo.png" alt="Polo Motorrad und Sportswear GmbH">
+        <div class="password-container">
+            <input type="password" id="password" placeholder="Passwort">
+            <button onclick="checkPassword()">Bestätigen</button>
+        </div>
+    </div>
+
+    <h1>Reklamationsübersicht</h1>
+    
+    <div class="search-bar">
+        <label for="search">Suche:</label>
+        <input type="text" id="search" onkeyup="searchTable()" placeholder="Nach Hersteller oder Information suchen...">
+    </div>
+    
+    <div class="dropdown">
+        <label for="hersteller">Hersteller:</label>
+        <select id="hersteller" onchange="filterTable()">
+            <option value="">Alle</option>
+            <!-- Optionen werden dynamisch hinzugefügt -->
+        </select>
+    </div>
+    
+    <table class="info-table" id="infoTable">
+        <thead>
+            <tr>
+                <th>Marke</th>
+                <th>Retoureabwicklung</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Datenreihen werden dynamisch hinzugefügt -->
+        </tbody>
+    </table>
+
+    <div class="edit-section hidden" id="edit-section">
+        <h2>Neue Einträge hinzufügen</h2>
+        <label for="newMarke">Marke:</label>
+        <input type="text" id="newMarke">
+        <label for="newInfo">Retoureabwicklung:</label>
+        <input type="text" id="newInfo">
+        <button onclick="addEntry()">Hinzufügen</button>
+    </div>
+</div>
+
+<script>
+    const correctPassword = "Polorekla24";
+
+    function checkPassword() {
+        const passwordInput = document.getElementById("password").value;
+        if (passwordInput === correctPassword) {
+            document.getElementById("password").value = "";
+            enableEditing();
+        } else {
+            alert("Falsches Passwort.");
+        }
+    }
+
+    function enableEditing() {
+        document.getElementById("edit-section").classList.remove("hidden");
+        document.querySelectorAll("#infoTable td").forEach(td => {
+            td.contentEditable = "true";
+            td.addEventListener('input', checkEmptyRow);
+        });
+    }
+
+    function checkEmptyRow() {
+        const table = document.getElementById("infoTable").getElementsByTagName("tbody")[0];
+        for (let row of table.rows) {
+            const marke = row.cells[0].textContent.trim();
+            const info = row.cells[1].textContent.trim();
+            if (!marke && !info) {
+                row.remove();
+            }
+        }
+        saveData();
+    }
+
+    async function loadData() {
+        const snapshot = await db.ref('reklamationen').get();
+        const data = snapshot.val();
+        if (data) {
+            const table = document.getElementById("infoTable").getElementsByTagName("tbody")[0];
+            table.innerHTML = "";
+            Object.keys(data).forEach(key => {
+                const entry = data[key];
+                const newRow = table.insertRow();
+                const cell1 = newRow.insertCell(0);
+                const cell2 = newRow.insertCell(1);
+                cell1.textContent = entry.marke;
+                cell2.textContent = entry.info;
+                cell1.contentEditable = "true";
+                cell2.contentEditable = "true";
+                cell1.addEventListener('input', checkEmptyRow);
+                cell2.addEventListener('input', checkEmptyRow);
+            });
+            populateDropdown();
+        }
+    }
+
+    function populateDropdown() {
+        const dropdown = document.getElementById("hersteller");
+        const table = document.getElementById("infoTable").getElementsByTagName("tbody")[0];
+        let uniqueMarken = new Set();
+
+        for (let row of table.rows) {
+            uniqueMarken.add(row.cells[0].textContent);
+        }
+
+        uniqueMarken.forEach(marke => {
+            let option = document.createElement("option");
+            option.value = marke;
+            option.textContent = marke;
+            dropdown.appendChild(option);
+        });
+    }
+
+    async function addEntry() {
+        const newMarke = document.getElementById("newMarke").value;
+        const newInfo = document.getElementById("newInfo").value;
+
+        if (newMarke && newInfo) {
+            const table = document.getElementById("infoTable").getElementsByTagName("tbody")[0];
+            const newRow = table.insertRow();
+
+            const cell1 = newRow.insertCell(0);
+            const cell2 = newRow.insertCell(1);
+
+            cell1.textContent = newMarke;
+            cell2.textContent = newInfo;
+
+            cell1.contentEditable = "true";
+            cell2.contentEditable = "true";
+            cell1.addEventListener('input', checkEmptyRow);
+            cell2.addEventListener('input', checkEmptyRow);
+
+            // Add to dropdown
+            const dropdown = document.getElementById("hersteller");
+            let option = document.createElement("option");
+            option.value = newMarke;
+            option.textContent = newMarke;
+            dropdown.appendChild(option);
+
+            document.getElementById("newMarke").value = "";
+            document.getElementById("newInfo").value = "";
+
+            // Save data to Firebase
+            const newEntry = {
+                marke: newMarke,
+                info: newInfo
+            };
+            const newKey = db.ref().child('reklamationen').push().key;
+            let updates = {};
+            updates['/reklamationen/' + newKey] = newEntry;
+            await db.ref().update(updates);
+        } else {
+            alert("Bitte alle Felder ausfüllen.");
+        }
+    }
+
+    async function saveData() {
+        const table = document.getElementById("infoTable").getElementsByTagName("tbody")[0];
+        let data = {};
+        for (let row of table.rows) {
+            const key = db.ref().child('reklamationen').push().key;
+            data[key] = {
+                marke: row.cells[0].textContent,
+                info: row.cells[1].textContent
+            };
+        }
+        await db.ref('reklamationen').set(data);
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        loadData();
+    });
+
+    window.addEventListener("beforeunload", function () {
+        saveData();
+    });
+
+    setInterval(saveData, 30000);
+
+    function searchTable() {
+        const input = document.getElementById("search");
+        const filter = input.value.toLowerCase();
+        const table = document.getElementById("infoTable");
+        const rows = table.getElementsByTagName("tr");
+
+        for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].getElementsByTagName("td");
+            let match = false;
+            for (let j = 0; j < cells.length; j++) {
+                if (cells[j]) {
+                    const cellValue = cells[j].textContent || cells[j].innerText;
+                    if (cellValue.toLowerCase().indexOf(filter) > -1) {
+                        match = true;
+                        break;
+                    }
+                }
+            }
+            if (match) {
+                rows[i].style.display = "";
+            } else {
+                rows[i].style.display = "none";
+            }
+        }
+    }
+
+    function filterTable() {
+        const dropdown = document.getElementById("hersteller");
+        const filter = dropdown.value.toLowerCase();
+        const table = document.getElementById("infoTable");
+        const rows = table.getElementsByTagName("tr");
+
+        for (let i = 1; i < rows.length; i++) {
+            const cells = rows[i].getElementsByTagName("td");
+            if (cells[0]) {
+                const cellValue = cells[0].textContent || cells[0].innerText;
+                if (cellValue.toLowerCase().indexOf(filter) > -1 || filter === "") {
+                    rows[i].style.display = "";
+                } else {
+                    rows[i].style.display = "none";
+                }
+            }
+        }
+    }
+</script>
+
+</body>
+</html>
